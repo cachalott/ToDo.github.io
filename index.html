@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Мои Задачи</title>
+    <style>
+        body { font-family: sans-serif; max-width: 500px; margin: 40px auto; padding: 20px; }
+        .task { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #ccc; }
+        .completed { text-decoration: line-through; color: gray; }
+        input[type="text"] { width: 70%; padding: 8px; }
+        button { padding: 8px 12px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <h2>Управление задачами</h2>
+    <div>
+        <input type="text" id="taskInput" placeholder="Новая задача...">
+        <button onclick="addTask()">Добавить</button>
+    </div>
+    
+    <div id="taskList" style="margin-top: 20px;"></div>
+
+    <script>
+        // Замени 'cachalot' на твой точный ник на PythonAnywhere
+        const SERVER_URL = 'http://127.0.0.1';
+
+        async function fetchTasks() {
+            try {
+                const res = await fetch(SERVER_URL);
+                const tasks = await res.json();
+                renderTasks(tasks);
+            } catch (err) {
+                console.error("Ошибка сети:", err);
+            }
+        }
+
+        async function addTask() {
+            const title = document.getElementById('taskInput').value;
+            if (!title) return;
+            
+            try {
+                await fetch(SERVER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title })
+                });
+                document.getElementById('taskInput').value = '';
+                fetchTasks();
+            } catch (err) {
+                console.error("Не удалось добавить задачу:", err);
+            }
+        }
+
+        async function toggleTask(id) {
+            try {
+                await fetch(SERVER_URL + '/' + id + '/toggle', { method: 'PUT' });
+                fetchTasks();
+            } catch (err) {
+                console.error("Ошибка переключения:", err);
+            }
+        }
+
+        async function deleteTask(id) {
+            try {
+                await fetch(SERVER_URL + '/' + id, { method: 'DELETE' });
+                fetchTasks();
+            } catch (err) {
+                console.error("Ошибка удаления:", err);
+            }
+        }
+
+        function renderTasks(tasks) {
+            const list = document.getElementById('taskList');
+            list.innerHTML = '';
+            if (tasks.length === 0) {
+                list.innerHTML = '<p style="color: gray;">Список задач пуст.</p>';
+                return;
+            }
+            tasks.forEach(task => {
+                list.innerHTML += `
+                    <div class="task ${task.completed ? 'completed' : ''}">
+                        <span onclick="toggleTask(${task.id})" style="cursor:pointer;">
+                            ${task.completed ? '✅' : '⬜'} ${task.title}
+                        </span>
+                        <button onclick="deleteTask(${task.id})">Удалить</button>
+                    </div>
+                `;
+            });
+        }
+
+        fetchTasks();
+    </script>
+</body>
+</html>
