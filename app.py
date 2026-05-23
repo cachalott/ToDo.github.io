@@ -1,10 +1,9 @@
 from flask import Flask, request, jsonify
-from flask_cors import CORS # Добавили импорт CORS
+from flask_cors import CORS 
 
 app = Flask(__name__)
-CORS(app) # Разрешили фронтенду общаться с бэкендом
+CORS(app) 
 
-# ООП: Класс отдельной задачи
 class Task:
     def __init__(self, task_id, title):
         self.id = task_id
@@ -14,7 +13,6 @@ class Task:
     def to_dict(self):
         return {"id": self.id, "title": self.title, "completed": self.completed}
 
-# ООП: Класс для управления списком задач
 class TaskManager:
     def __init__(self):
         self.tasks = []
@@ -41,8 +39,6 @@ class TaskManager:
 
 manager = TaskManager()
 
-# --- API Роуты (Связь с клиентской частью) ---
-
 @app.route('/api/tasks', methods=['GET'])
 def get_tasks():
     return jsonify(manager.get_tasks())
@@ -66,5 +62,4 @@ def toggle_task(task_id):
     return jsonify({"error": "Not found"}), 404
 
 if __name__ == '__main__':
-    # Запуск сервера
     app.run(debug=True, port=5000)
