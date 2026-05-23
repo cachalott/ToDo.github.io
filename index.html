@@ -2,32 +2,158 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Мои Задачи</title>
     <style>
-        body { font-family: sans-serif; max-width: 500px; margin: 40px auto; padding: 20px; }
-        .task { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #ccc; }
-        .completed span { text-decoration: line-through; color: gray; }
-        input[type="text"] { width: 70%; padding: 8px; }
-        button { padding: 8px 12px; cursor: pointer; }
+        body {
+            font-family: sans-serif;
+            max-width: 500px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        h2 {
+            margin-bottom: 16px;
+        }
+
+        .input-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .input-row input {
+            flex: 1;
+            padding: 8px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .input-row button {
+            padding: 8px 14px;
+            cursor: pointer;
+            background: #4a90d9;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .filters {
+            margin-bottom: 12px;
+            display: flex;
+            gap: 6px;
+        }
+
+        .filters button {
+            padding: 5px 12px;
+            cursor: pointer;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .filters button.active {
+            background: #4a90d9;
+            color: white;
+            border-color: #4a90d9;
+        }
+
+        .task {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+            background: white;
+            margin-bottom: 4px;
+            border-radius: 4px;
+        }
+
+        .task span {
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .task.completed span {
+            text-decoration: line-through;
+            color: gray;
+        }
+
+        .task button {
+            padding: 4px 10px;
+            cursor: pointer;
+            background: none;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .task button:hover {
+            border-color: #e74c3c;
+            color: #e74c3c;
+        }
+
+        .stats {
+            font-size: 13px;
+            color: gray;
+            margin-bottom: 10px;
+        }
+
+        #emptyMsg {
+            color: gray;
+            font-size: 14px;
+            padding: 10px 0;
+        }
+
+        .clear-btn {
+            margin-top: 10px;
+            font-size: 13px;
+            color: gray;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .clear-btn:hover { color: #e74c3c; }
+
+        @media (max-width: 540px) {
+            body { margin: 20px auto; }
+        }
     </style>
 </head>
 <body>
 
     <h2>Управление задачами</h2>
-    <div>
+
+    <div class="input-row">
         <input type="text" id="taskInput" placeholder="Новая задача...">
         <button onclick="addTask()">Добавить</button>
     </div>
 
-    <div id="taskList" style="margin-top: 20px;"></div>
+    <div class="filters">
+        <button class="active" onclick="setFilter('all', this)">Все</button>
+        <button onclick="setFilter('active', this)">Активные</button>
+        <button onclick="setFilter('done', this)">Выполненные</button>
+    </div>
+
+    <div class="stats" id="stats"></div>
+    <div id="taskList"></div>
+    <button class="clear-btn" id="clearBtn" style="display:none" onclick="clearCompleted()">Удалить выполненные</button>
 
     <script>
-        function loadTasks() {
-            const data = localStorage.getItem('tasks');
-            return data ? JSON.parse(data) : [];
+        let filter = 'all';
+
+        function load() {
+            return JSON.parse(localStorage.getItem('tasks') || '[]');
         }
 
-        function saveTasks(tasks) {
+        function save(tasks) {
             localStorage.setItem('tasks', JSON.stringify(tasks));
         }
 
@@ -35,53 +161,65 @@
             const input = document.getElementById('taskInput');
             const title = input.value.trim();
             if (!title) return;
-
-            const tasks = loadTasks();
-            const newTask = {
-                id: Date.now(), 
-                title: title,
-                completed: false
-            };
-            tasks.push(newTask);
-            saveTasks(tasks);
-
+            const tasks = load();
+            tasks.push({ id: Date.now(), title, completed: false });
+            save(tasks);
             input.value = '';
-            renderTasks();
+            render();
         }
 
         function toggleTask(id) {
-            const tasks = loadTasks();
-            const task = tasks.find(t => t.id === id);
-            if (task) task.completed = !task.completed;
-            saveTasks(tasks);
-            renderTasks();
+            save(load().map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+            render();
         }
 
         function deleteTask(id) {
-            const tasks = loadTasks().filter(t => t.id !== id);
-            saveTasks(tasks);
-            renderTasks();
+            save(load().filter(t => t.id !== id));
+            render();
         }
 
-        function renderTasks() {
-            const tasks = loadTasks();
-            const list = document.getElementById('taskList');
-            list.innerHTML = '';
+        function clearCompleted() {
+            save(load().filter(t => !t.completed));
+            render();
+        }
 
-            if (tasks.length === 0) {
-                list.innerHTML = '<p style="color: gray;">Список задач пуст.</p>';
+        function setFilter(val, btn) {
+            filter = val;
+            document.querySelectorAll('.filters button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            render();
+        }
+
+        function render() {
+            const all = load();
+            const done = all.filter(t => t.completed).length;
+
+            document.getElementById('stats').textContent =
+                all.length ? 'Выполнено: ' + done + ' из ' + all.length : '';
+
+            document.getElementById('clearBtn').style.display = done > 0 ? 'inline' : 'none';
+
+            let list = all;
+            if (filter === 'active') list = all.filter(t => !t.completed);
+            if (filter === 'done')   list = all.filter(t => t.completed);
+
+            const container = document.getElementById('taskList');
+            container.innerHTML = '';
+
+            if (list.length === 0) {
+                container.innerHTML = '<div id="emptyMsg">Список задач пуст.</div>';
                 return;
             }
 
-            tasks.forEach(task => {
-                list.innerHTML += `
-                    <div class="task ${task.completed ? 'completed' : ''}">
-                        <span onclick="toggleTask(${task.id})" style="cursor:pointer;">
-                            ${task.completed ? '✅' : '⬜'} ${task.title}
-                        </span>
-                        <button onclick="deleteTask(${task.id})">Удалить</button>
-                    </div>
-                `;
+            list.forEach(task => {
+                const div = document.createElement('div');
+                div.className = 'task' + (task.completed ? ' completed' : '');
+                div.innerHTML =
+                    '<span onclick="toggleTask(' + task.id + ')">' +
+                    (task.completed ? '✅' : '⬜') + ' ' + task.title +
+                    '</span>' +
+                    '<button onclick="deleteTask(' + task.id + ')">Удалить</button>';
+                container.appendChild(div);
             });
         }
 
@@ -89,7 +227,7 @@
             if (e.key === 'Enter') addTask();
         });
 
-        renderTasks();
+        render();
     </script>
 </body>
 </html>
