@@ -19,12 +19,21 @@
 
         .input-row {
             display: flex;
+            flex-wrap: wrap;
             gap: 8px;
             margin-bottom: 12px;
         }
 
-        .input-row input {
-            flex: 1;
+        .input-row input[type="text"] {
+            flex: 2 1 180px;
+            padding: 8px;
+            font-size: 14px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .input-row input[type="date"] {
+            flex: 1 1 140px;
             padding: 8px;
             font-size: 14px;
             border: 1px solid #ccc;
@@ -44,6 +53,7 @@
         .filters {
             margin-bottom: 12px;
             display: flex;
+            flex-wrap: wrap;
             gap: 6px;
         }
 
@@ -60,6 +70,84 @@
             background: #4a90d9;
             color: white;
             border-color: #4a90d9;
+        }
+
+        #calendarBox {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+
+        .cal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .cal-header button {
+            padding: 2px 10px;
+            cursor: pointer;
+            background: none;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #666;
+        }
+
+        .cal-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            text-align: center;
+        }
+
+        .cal-day-name {
+            color: gray;
+            font-size: 11px;
+            padding: 4px 0;
+        }
+
+        .cal-day {
+            padding: 6px 0;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .cal-day:hover {
+            background: #eef4fb;
+        }
+
+        .cal-day.empty {
+            cursor: default;
+        }
+
+        .cal-day.today {
+            border: 1px solid #4a90d9;
+        }
+
+        .cal-day.selected {
+            background: #4a90d9;
+            color: white;
+        }
+
+        .cal-day.has-tasks::after {
+            content: '';
+            display: block;
+            width: 4px;
+            height: 4px;
+            margin: 2px auto 0;
+            border-radius: 50%;
+            background: #4a90d9;
+        }
+
+        .cal-day.selected.has-tasks::after {
+            background: white;
         }
 
         .task {
@@ -81,6 +169,16 @@
         .task.completed span {
             text-decoration: line-through;
             color: gray;
+        }
+
+        .task-date {
+            font-size: 12px;
+            color: gray;
+            margin-left: 6px;
+        }
+
+        .task-date.overdue {
+            color: #e74c3c;
         }
 
         .task button {
@@ -133,6 +231,7 @@
 
     <div class="input-row">
         <input type="text" id="taskInput" placeholder="Новая задача...">
+        <input type="date" id="dateInput">
         <button onclick="addTask()">Добавить</button>
     </div>
 
@@ -140,6 +239,17 @@
         <button class="active" onclick="setFilter('all', this)">Все</button>
         <button onclick="setFilter('active', this)">Активные</button>
         <button onclick="setFilter('done', this)">Выполненные</button>
+        <button id="calBtn" onclick="toggleCalendar()">Календарь</button>
+    </div>
+
+    <div id="calendarBox" style="display:none">
+        <div class="cal-header">
+            <button onclick="changeMonth(-1)">←</button>
+            <span id="calTitle"></span>
+            <button onclick="changeMonth(1)">→</button>
+        </div>
+        <div class="cal-grid" id="calGrid"></div>
+        <button class="clear-btn" id="dateFilterClear" style="display:none" onclick="clearDateFilter()">Показать все даты</button>
     </div>
 
     <div class="stats" id="stats"></div>
@@ -148,6 +258,10 @@
 
     <script>
         let filter = 'all';
+        let selectedDate = null;
+        let calendarVisible = false;
+        let calYear = new Date().getFullYear();
+        let calMonth = new Date().getMonth();
 
         function load() {
             return JSON.parse(localStorage.getItem('tasks') || '[]');
@@ -159,12 +273,19 @@
 
         function addTask() {
             const input = document.getElementById('taskInput');
+            const dateInput = document.getElementById('dateInput');
             const title = input.value.trim();
             if (!title) return;
             const tasks = load();
-            tasks.push({ id: Date.now(), title, completed: false });
+            tasks.push({
+                id: Date.now(),
+                title,
+                completed: false,
+                due_date: dateInput.value || null
+            });
             save(tasks);
             input.value = '';
+            dateInput.value = '';
             render();
         }
 
@@ -190,6 +311,77 @@
             render();
         }
 
+        function isOverdue(task) {
+            if (!task.due_date || task.completed) return false;
+            const today = new Date().toISOString().slice(0, 10);
+            return task.due_date < today;
+        }
+
+        function formatDate(dateStr) {
+            const parts = dateStr.split('-');
+            return parts[2] + '.' + parts[1] + '.' + parts[0];
+        }
+
+        function toggleCalendar() {
+            calendarVisible = !calendarVisible;
+            document.getElementById('calendarBox').style.display = calendarVisible ? 'block' : 'none';
+            document.getElementById('calBtn').classList.toggle('active', calendarVisible);
+            if (calendarVisible) renderCalendar();
+        }
+
+        function changeMonth(step) {
+            calMonth += step;
+            if (calMonth > 11) { calMonth = 0; calYear++; }
+            if (calMonth < 0) { calMonth = 11; calYear--; }
+            renderCalendar();
+        }
+
+        function selectDate(dateStr) {
+            selectedDate = (selectedDate === dateStr) ? null : dateStr;
+            renderCalendar();
+            render();
+        }
+
+        function clearDateFilter() {
+            selectedDate = null;
+            renderCalendar();
+            render();
+        }
+
+        function renderCalendar() {
+            const monthNames = ['Январь','Февраль','Март','Апрель','Май','Июнь',
+                                 'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+            document.getElementById('calTitle').textContent = monthNames[calMonth] + ' ' + calYear;
+
+            const tasks = load();
+            const firstDay = new Date(calYear, calMonth, 1);
+            const startOffset = (firstDay.getDay() + 6) % 7; // неделя с понедельника
+            const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+            const todayStr = new Date().toISOString().slice(0, 10);
+
+            const dayNames = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+            let html = dayNames.map(d => '<div class="cal-day-name">' + d + '</div>').join('');
+
+            for (let i = 0; i < startOffset; i++) {
+                html += '<div class="cal-day empty"></div>';
+            }
+
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = calYear + '-' + String(calMonth + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+                const dayTasks = tasks.filter(t => t.due_date === dateStr);
+
+                let cls = 'cal-day';
+                if (dateStr === todayStr) cls += ' today';
+                if (dateStr === selectedDate) cls += ' selected';
+                if (dayTasks.length > 0) cls += ' has-tasks';
+
+                html += '<div class="' + cls + '" onclick="selectDate(\'' + dateStr + '\')">' + day + '</div>';
+            }
+
+            document.getElementById('calGrid').innerHTML = html;
+            document.getElementById('dateFilterClear').style.display = selectedDate ? 'inline' : 'none';
+        }
+
         function render() {
             const all = load();
             const done = all.filter(t => t.completed).length;
@@ -202,6 +394,7 @@
             let list = all;
             if (filter === 'active') list = all.filter(t => !t.completed);
             if (filter === 'done')   list = all.filter(t => t.completed);
+            if (selectedDate)        list = list.filter(t => t.due_date === selectedDate);
 
             const container = document.getElementById('taskList');
             container.innerHTML = '';
@@ -214,9 +407,14 @@
             list.forEach(task => {
                 const div = document.createElement('div');
                 div.className = 'task' + (task.completed ? ' completed' : '');
+
+                const dateHtml = task.due_date
+                    ? '<span class="task-date' + (isOverdue(task) ? ' overdue' : '') + '">' + formatDate(task.due_date) + '</span>'
+                    : '';
+
                 div.innerHTML =
                     '<span onclick="toggleTask(' + task.id + ')">' +
-                    (task.completed ? '✅' : '⬜') + ' ' + task.title +
+                    (task.completed ? '✅' : '⬜') + ' ' + task.title + dateHtml +
                     '</span>' +
                     '<button onclick="deleteTask(' + task.id + ')">Удалить</button>';
                 container.appendChild(div);
